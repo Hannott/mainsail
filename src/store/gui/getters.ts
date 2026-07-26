@@ -158,6 +158,20 @@ export const getters: GetterTree<GuiState, RootState> = {
             return panels.filter((element) => allPossiblePanels.includes(element.name))
         },
 
+    /**
+     * Returns the panels of a layout exactly as they are stored in the database.
+     *
+     * In contrast to getPanels, nothing is filtered out or added, so this can be used as base
+     * to write a layout back to the database without losing panels which are currently
+     * unavailable (e.g. spoolman is offline) or hidden.
+     */
+    getStoredPanels: (state) => (viewport: string, column: number) => {
+        const layoutName = (column ? `${viewport}Layout${column}` : `${viewport}Layout`) as keyof GuiStateDashboard
+        const panels = state.dashboard[layoutName] as GuiStateLayoutoption[]
+
+        return panels?.filter((element) => element !== null) ?? []
+    },
+
     getAllPanelsFromViewport: (state) => (viewport: string) => {
         let panels: GuiStateLayoutoption[] = []
 
