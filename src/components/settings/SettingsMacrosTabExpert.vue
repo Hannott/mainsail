@@ -353,7 +353,7 @@ export default class SettingsMacrosTabExpert extends Mixins(BaseMixin, ThemeMixi
 
     private boolFormEdit = false
     private editGroupId: string | null = ''
-    private searchMacros: string = ''
+    private searchMacros: string | null = ''
 
     get groupColors() {
         return [
@@ -397,18 +397,23 @@ export default class SettingsMacrosTabExpert extends Mixins(BaseMixin, ThemeMixi
         return colors
     }
 
-    get allMacros() {
-        const macros = this.$store.getters['printer/getMacros'] ?? []
-        return macros.filter((macro: PrinterStateMacro) => {
+    get allMacros(): PrinterStateMacro[] {
+        return this.$store.getters['printer/getMacros'] ?? []
+    }
+
+    get filteredMacros() {
+        const search = (this.searchMacros ?? '').toLowerCase()
+
+        return this.allMacros.filter((macro: PrinterStateMacro) => {
             return (
-                macro.name.toLowerCase().includes(this.searchMacros.toLowerCase()) ||
-                macro.description?.toLowerCase().includes(this.searchMacros.toLowerCase())
+                macro.name.toLowerCase().includes(search) ||
+                (macro.description?.toLowerCase().includes(search) ?? false)
             )
         })
     }
 
     get availableMacros() {
-        return this.allMacros.filter((m: GuiMacrosStateMacrogroupMacro) => !this.editGroupUsedMacros.includes(m.name))
+        return this.filteredMacros.filter((m: PrinterStateMacro) => !this.editGroupUsedMacros.includes(m.name))
     }
 
     get groups() {
