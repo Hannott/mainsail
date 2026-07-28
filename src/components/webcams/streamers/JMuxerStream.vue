@@ -20,6 +20,7 @@ import WebcamMixin from '@/components/mixins/webcam'
 @Component
 export default class JMuxerStreamer extends Mixins(BaseMixin, WebcamMixin) {
     jmuxer: JMuxer | null = null
+    ws: WebSocket | null = null
     status: string = 'connecting'
     aspectRatio: number | null = null
 
@@ -52,7 +53,7 @@ export default class JMuxerStreamer extends Mixins(BaseMixin, WebcamMixin) {
 
     play() {
         this.status = 'connecting'
-        this.jmuxer?.destroy()
+        this.stop()
 
         // Only websocket streams supported
         if (!this.url.startsWith('ws://') && !this.url.startsWith('wss://')) {
@@ -80,21 +81,37 @@ export default class JMuxerStreamer extends Mixins(BaseMixin, WebcamMixin) {
         })
 
         const ws = new WebSocket(this.url)
+        this.ws = ws
         ws.binaryType = 'arraybuffer'
+
+        // guard every handler against `ws` having been replaced by a later play(),
+        // so a socket still closing down can never feed the current jmuxer instance
         ws.addEventListener('message', (event) => {
+            if (this.ws !== ws) return
+
             this.jmuxer?.feed({
                 video: new Uint8Array(event.data),
             })
         })
 
         ws.addEventListener('error', (event) => {
+            if (this.ws !== ws) return
+
             this.status = 'error'
             console.log('jmuxer ws error:', event)
         })
     }
 
-    beforeUnmount() {
+    stop() {
+        this.ws?.close()
+        this.ws = null
+
         this.jmuxer?.destroy()
+        this.jmuxer = null
+    }
+
+    beforeDestroy() {
+        this.stop()
     }
 
     @Watch('camSettings', { deep: true })
