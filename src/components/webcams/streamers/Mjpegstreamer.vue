@@ -156,6 +156,10 @@ export default class Mjpegstreamer extends Mixins(BaseMixin, WebcamMixin) {
                 this.status = 'error'
                 this.statusMessage = this.$t('Panels.WebcamPanel.ErrorWhileConnecting', { url: this.url }).toString()
                 this.streamState = false
+
+                // clear the watchdog armed by startStream() first - overwriting it
+                // would orphan it and leave two restart timers running
+                if (this.timerRestart) window.clearTimeout(this.timerRestart)
                 this.timerRestart = window.setTimeout(() => this.restartStream(), 5000)
                 break
             case 'log':
@@ -217,9 +221,22 @@ export default class Mjpegstreamer extends Mixins(BaseMixin, WebcamMixin) {
 
     beforeDestroy() {
         document.removeEventListener('visibilitychange', this.documentVisibilityChanged)
-        this.stopStream()
-        this.worker?.terminate()
+
+        this.streamState = false
+        this.clearTimeouts()
+
+        const worker = this.worker
         this.worker = null
+        if (!worker) return
+
+        // Ask the worker to abort its fetch and close itself. Calling terminate()
+        // here would discard the queued message, leaving the MJPEG connection open
+        // until the browser tears the worker down - which collides with the
+        // connection the freshly recreated component opens (see beforeDestroy note).
+        worker.postMessage({ type: 'shutdown' })
+
+        // safety net, in case the worker never reaches close()
+        window.setTimeout(() => worker.terminate(), 2000)
     }
 
     clearTimeouts() {

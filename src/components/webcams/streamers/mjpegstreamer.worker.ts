@@ -9,6 +9,7 @@ const CONTENT_LENGTH = 'content-length'
 const SOI = new Uint8Array([0xff, 0xd8])
 
 let reader: ReadableStreamDefaultReader<Uint8Array> | null = null
+let controller: AbortController | null = null
 let canvas: OffscreenCanvas | null = null
 let context: OffscreenCanvasRenderingContext2D | null = null
 let running = false
@@ -18,7 +19,12 @@ let connected = false
 let lastWidth = 0
 let lastHeight = 0
 
-type InMessage = { type: 'init'; canvas: OffscreenCanvas } | { type: 'start'; url: string } | { type: 'stop' }
+// bumped by every start(); an invocation that no longer owns the current
+// generation must not touch the shared reader/running state on its way out
+let generation = 0
+
+type InMessage =
+    { type: 'init'; canvas: OffscreenCanvas } | { type: 'start'; url: string } | { type: 'stop' } | { type: 'shutdown' }
 
 function getLength(headers: string): number {
     let contentLength = -1
@@ -128,15 +134,25 @@ async function start(url: string) {
     lastWidth = 0
     lastHeight = 0
 
+    const myGeneration = ++generation
+
     // wait for any in-flight stop() to finish releasing/nulling the previous reader,
     // otherwise it can clobber the new reader we are about to create (restart race)
     if (stopping) await stopping
+
+    // a newer start() overtook us while we waited - it owns the state now
+    if (myGeneration !== generation) return
+
+    const myController = new AbortController()
+    controller = myController
 
     try {
         const u = new URL(url)
         u.searchParams.append('timestamp', Date.now().toString())
 
-        const response = await fetch(u.toString(), { mode: 'cors' })
+        const response = await fetch(u.toString(), { mode: 'cors', signal: myController.signal })
+
+        if (myGeneration !== generation) return
 
         if (!response.ok) {
             ctx_self.postMessage({ type: 'error', message: `${response.status}: ${response.statusText}` })
@@ -152,17 +168,27 @@ async function start(url: string) {
 
         reader = response.body.getReader()
         await readStream()
-        reader = null
+
+        if (myGeneration === generation) reader = null
     } catch (error: unknown) {
+        // an abort is our own doing (stop/restart), not a stream failure
+        if (myController.signal.aborted || myGeneration !== generation) return
+
         const message = error instanceof Error ? error.message : String(error)
         ctx_self.postMessage({ type: 'error', message })
     } finally {
-        running = false
+        if (myGeneration === generation) running = false
     }
 }
 
 async function stop() {
     running = false
+
+    // abort the fetch itself, so the connection is released immediately instead of
+    // lingering until the response body happens to wind down
+    controller?.abort()
+    controller = null
+
     try {
         await reader?.cancel()
         reader?.releaseLock()
@@ -185,6 +211,11 @@ ctx_self.onmessage = (event: MessageEvent<InMessage>) => {
             break
         case 'stop':
             stopping = stop()
+            break
+        case 'shutdown':
+            // release the connection before going away; terminate() from the main
+            // thread would discard this work and leave the socket dangling
+            stopping = stop().finally(() => ctx_self.close())
             break
     }
 }
