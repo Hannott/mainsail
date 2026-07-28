@@ -1,18 +1,11 @@
 <template>
     <div class="webcamBackground" :style="wrapperStyle">
-        <video
-            ref="video"
-            v-observe-visibility="visibilityChanged"
-            autoplay
-            muted
-            :style="webcamStyle"
-            class="webcamImage"
-            @loadedmetadata="onLoadedMetadata" />
+        <video ref="video" autoplay muted :style="webcamStyle" class="webcamImage" @loadedmetadata="onLoadedMetadata" />
     </div>
 </template>
 
 <script lang="ts">
-import { Component, Mixins, Prop, Ref } from 'vue-property-decorator'
+import { Component, Mixins, Prop, Ref, Watch } from 'vue-property-decorator'
 import BaseMixin from '@/components/mixins/base'
 import Hls from 'hls.js'
 import { GuiWebcamStateWebcam } from '@/store/gui/webcams/types'
@@ -21,7 +14,6 @@ import WebcamMixin from '@/components/mixins/webcam'
 @Component
 export default class Hlsstreamer extends Mixins(BaseMixin, WebcamMixin) {
     aspectRatio: null | number = null
-    isVisible = true
     hls: Hls | null = null
 
     @Prop({ required: true }) readonly camSettings!: GuiWebcamStateWebcam
@@ -47,10 +39,6 @@ export default class Hlsstreamer extends Mixins(BaseMixin, WebcamMixin) {
         }
     }
 
-    visibilityChanged(isVisible: boolean) {
-        this.isVisible = isVisible
-    }
-
     mounted() {
         this.play()
     }
@@ -59,7 +47,9 @@ export default class Hlsstreamer extends Mixins(BaseMixin, WebcamMixin) {
         this.aspectRatio = this.updateAspectRatioFromVideo(this.video)
     }
 
-    updated() {
+    // restart the stream only when the source actually changes, not on every re-render
+    @Watch('url')
+    onUrlChanged() {
         this.play()
     }
 
@@ -88,8 +78,9 @@ export default class Hlsstreamer extends Mixins(BaseMixin, WebcamMixin) {
         }
     }
 
-    beforeUnmount() {
+    beforeDestroy() {
         this.hls?.destroy()
+        this.hls = null
     }
 }
 </script>
