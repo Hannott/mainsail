@@ -7,6 +7,7 @@ type ComponentOptions = {
     macros?: Partial<PrinterStateMacro>[]
     group?: Partial<GuiMacrosStateMacrogroup>
     search?: string | null
+    klipperReady?: boolean
 }
 
 interface MacrosTabExpert {
@@ -15,6 +16,7 @@ interface MacrosTabExpert {
     allMacros: PrinterStateMacro[]
     filteredMacros: PrinterStateMacro[]
     availableMacros: PrinterStateMacro[]
+    macroListLoaded: boolean
     existsMacro(macroname: string): boolean
     getMacroDescription(macroname: string): string | null
 }
@@ -22,10 +24,19 @@ interface MacrosTabExpert {
 const MacrosTabExpertClass = SettingsMacrosTabExpert as unknown as new () => MacrosTabExpert
 
 const createComponent = (options: ComponentOptions = {}) => {
+    const klipperReady = options.klipperReady ?? true
+
     const component = new MacrosTabExpertClass()
 
     Object.defineProperty(component, '$store', {
         value: {
+            state: {
+                socket: { isConnected: klipperReady },
+                server: {
+                    klippy_connected: klipperReady,
+                    klippy_state: klipperReady ? 'ready' : 'shutdown',
+                },
+            },
             getters: {
                 'printer/getMacros': options.macros ?? [],
                 'gui/macros/getMacrogroup': () => options.group,
@@ -138,6 +149,20 @@ describe('SettingsMacrosTabExpert', () => {
             const component = createComponent({ macros: [{ name: 'START_PRINT' }] })
 
             expect(component.getMacroDescription('START_PRINT')).toBeNull()
+        })
+
+        it('does not report macros as deleted while klipper is not ready', () => {
+            const component = createComponent({ macros: [], klipperReady: false })
+
+            expect(component.existsMacro('START_PRINT')).toBe(true)
+            expect(component.getMacroDescription('START_PRINT')).toBeNull()
+        })
+
+        it('reports a macro as deleted once klipper is ready with a genuinely empty macro list', () => {
+            const component = createComponent({ macros: [], klipperReady: true })
+
+            expect(component.existsMacro('START_PRINT')).toBe(false)
+            expect(component.getMacroDescription('START_PRINT')).toBe('Settings.MacrosTab.DeletedMacro')
         })
     })
 })
