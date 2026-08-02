@@ -749,6 +749,7 @@
         },
         "MacrosPanel": {
             "Headline": "Macros",
+            "Reorder": "Reorder macros",
             "Send": "send"
         },
         "MiniconsolePanel": {

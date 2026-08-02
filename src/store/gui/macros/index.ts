@@ -9,6 +9,7 @@ export const getDefaultState = (): GuiMacrosState => {
     return {
         mode: 'simple',
         hiddenMacros: [],
+        macroOrder: [],
         macrogroups: {},
     }
 }
