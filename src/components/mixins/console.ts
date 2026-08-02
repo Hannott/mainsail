@@ -55,6 +55,14 @@ export default class ConsoleMixin extends Vue {
         this.$store.dispatch('gui/saveSetting', { name: 'console.rawOutput', value: newVal })
     }
 
+    get compactEntries(): boolean {
+        return this.$store.state.gui.console.entryStyle === 'compact'
+    }
+
+    set compactEntries(newVal) {
+        this.$store.dispatch('gui/saveSetting', { name: 'console.entryStyle', value: newVal ? 'compact' : 'default' })
+    }
+
     get lastCommands(): string[] {
         return this.$store.state.gui.gcodehistory.entries ?? []
     }

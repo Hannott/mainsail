@@ -30,6 +30,13 @@
                     </v-list-item>
                     <v-list-item class="minHeight36">
                         <v-checkbox
+                            v-model="compactEntries"
+                            class="mt-0"
+                            hide-details
+                            :label="$t('Panels.MiniconsolePanel.CompactEntries')" />
+                    </v-list-item>
+                    <v-list-item class="minHeight36">
+                        <v-checkbox
                             v-model="hideWaitTemperatures"
                             class="mt-0"
                             hide-details
