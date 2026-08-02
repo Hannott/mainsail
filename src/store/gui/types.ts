@@ -209,6 +209,7 @@ export interface GuiState {
                 dashboard: string
                 page: string
             }
+            order: string[]
         }
         mmu: {
             showClogDetection: boolean

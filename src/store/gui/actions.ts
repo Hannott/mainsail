@@ -225,6 +225,14 @@ export const actions: ActionTree<GuiState, RootState> = {
         })
     },
 
+    setWebcamsOrder({ commit, dispatch }, order: string[]) {
+        commit('setWebcamsOrder', order)
+        dispatch('updateSettings', {
+            keyName: 'view.webcam.order',
+            newVal: order,
+        })
+    },
+
     setTempchartDatasetAdditionalSensorSetting({ commit, dispatch, state }, payload) {
         commit('setTempchartDatasetAdditionalSensorSetting', payload)
         dispatch('updateSettings', {

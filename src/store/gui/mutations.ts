@@ -43,6 +43,10 @@ export const mutations: MutationTree<GuiState> = {
         Vue.set(state.view.webcam.currentCam, payload.page, payload.value)
     },
 
+    setWebcamsOrder(state, order: string[]) {
+        Vue.set(state.view.webcam, 'order', order)
+    },
+
     setHistoryColumns(state, data) {
         if (data.value && state.view.history.hideColums.includes(data.name)) {
             state.view.history.hideColums.splice(state.view.history.hideColums.indexOf(data.name), 1)
