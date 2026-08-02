@@ -315,6 +315,7 @@ export const getDefaultState = (): GuiState => {
                     dashboard: 'all',
                     page: 'all',
                 },
+                order: [],
             },
         },
     }

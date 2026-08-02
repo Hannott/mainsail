@@ -3,12 +3,19 @@
         <v-card v-if="!boolForm" flat>
             <v-card-text>
                 <h3 class="text-h5 mb-3">{{ $t('Settings.WebcamsTab.Webcams') }}</h3>
-                <webcam-list-entry
-                    v-for="(webcam, index) in webcams"
-                    :key="webcam.name"
-                    :webcam="webcam"
-                    :bool-border-top="index > 0"
-                    @edit-webcam="editWebcam" />
+                <draggable
+                    v-model="webcams"
+                    handle=".handle"
+                    ghost-class="ghost"
+                    group="webcams"
+                    :force-fallback="true">
+                    <webcam-list-entry
+                        v-for="(webcam, index) in webcams"
+                        :key="webcam.name"
+                        :webcam="webcam"
+                        :bool-border-top="index > 0"
+                        @edit-webcam="editWebcam" />
+                </draggable>
             </v-card-text>
             <v-card-actions>
                 <v-btn v-if="existCrowsnestConf" text color="primary" @click="openCrowsnestConf">
@@ -34,6 +41,7 @@ import { FileStateFile } from '@/store/files/types'
 import WebcamForm from '@/components/settings/Webcams/WebcamForm.vue'
 import WebcamListEntry from '@/components/settings/Webcams/WebcamListEntry.vue'
 import { GuiWebcamStateWebcam } from '@/store/gui/webcams/types'
+import draggable from 'vuedraggable'
 
 const DEFAULT_ASPECT_RATIO = '16:9'
 
@@ -42,6 +50,7 @@ const DEFAULT_ASPECT_RATIO = '16:9'
         SettingsRow,
         WebcamForm,
         WebcamListEntry,
+        draggable,
     },
 })
 export default class SettingsWebcamsTab extends Mixins(BaseMixin, WebcamMixin) {
@@ -52,8 +61,15 @@ export default class SettingsWebcamsTab extends Mixins(BaseMixin, WebcamMixin) {
     private typeForm: 'create' | 'edit' = 'create'
     private formWebcam: GuiWebcamStateWebcam = {} as GuiWebcamStateWebcam
 
-    get webcams() {
-        return this.$store.state.gui.webcams.webcams ?? []
+    get webcams(): GuiWebcamStateWebcam[] {
+        return this.$store.getters['gui/webcams/getAllWebcams'] ?? []
+    }
+
+    set webcams(newVal: GuiWebcamStateWebcam[]) {
+        this.$store.dispatch(
+            'gui/setWebcamsOrder',
+            newVal.map((webcam) => webcam.name)
+        )
     }
 
     get configfiles() {
