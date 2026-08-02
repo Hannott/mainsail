@@ -167,6 +167,7 @@
     },
     "Console": {
         "CommandList": "Command list",
+        "CompactEntries": "Compact entries",
         "Empty": "Empty",
         "HideTemperatures": "Hide temperatures",
         "HideTimelapse": "Hide Timelapse",
@@ -752,6 +753,7 @@
         },
         "MiniconsolePanel": {
             "Autoscroll": "Autoscroll",
+            "CompactEntries": "Compact entries",
             "Headline": "Console",
             "HideTemperatures": "Hide temperatures",
             "HideTimelapse": "Hide Timelapse",
