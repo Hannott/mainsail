@@ -88,7 +88,7 @@
                             :show-flat="showFlat"
                             :wireframe="wireframe"
                             :scale-gradient="scaleGradient"
-                            :scale-z-max="scaleZMax" />
+                            :scale-z-max="localScaleZMax" />
                     </v-col>
                 </v-row>
                 <v-row>
@@ -116,14 +116,15 @@
                 <v-row>
                     <v-col>
                         <v-slider
-                            v-model="scaleZMax"
+                            v-model="localScaleZMax"
                             :label="$t('Heightmap.ScaleZMax')"
                             :min="heightmapRangeLimit[0]"
                             :max="heightmapRangeLimit[1]"
                             :step="0.1"
                             ticks="always"
                             class="mt-4"
-                            hide-details />
+                            hide-details
+                            @change="scaleZMax = localScaleZMax" />
                     </v-col>
                 </v-row>
             </v-card-text>
@@ -132,7 +133,7 @@
     </panel>
 </template>
 <script lang="ts">
-import { Component, Mixins } from 'vue-property-decorator'
+import { Component, Mixins, Watch } from 'vue-property-decorator'
 import BaseMixin from '@/components/mixins/base'
 import { mdiGrid, mdiHome } from '@mdi/js'
 import ControlMixin from '@/components/mixins/control'
@@ -147,6 +148,13 @@ export default class HeightmapChartPanel extends Mixins(BaseMixin, ControlMixin,
     mdiHome = mdiHome
 
     calibrateDialog = false
+
+    localScaleZMax = this.scaleZMax
+
+    @Watch('scaleZMax')
+    scaleZMaxChanged(newVal: number): void {
+        this.localScaleZMax = newVal
+    }
 
     get showProbed(): boolean {
         return this.$store.state.gui.view.heightmap.probed ?? true
