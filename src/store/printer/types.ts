@@ -182,6 +182,7 @@ export interface PrinterStateGcodeCommandParam {
     type?: 'int' | 'float' | 'string' | 'boolean'
     required?: boolean
     default?: unknown
+    enum?: string[]
 }
 
 export interface PrinterStateGcodeCommand {

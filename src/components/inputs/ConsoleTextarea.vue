@@ -25,9 +25,13 @@
             @click="onCursorActivity"
             @click:prepend="onAutocomplete"
             @click:append="doSend" />
-        <div v-if="activeParam" class="gcode-ghost-overlay" :style="overlayStyle" aria-hidden="true">
-            <span class="gcode-ghost-mirror">{{ gcode }}</span
-            ><span class="gcode-ghost-text">{{ activeParam }}=</span>
+        <div
+            v-if="activeParam || activeValueSuffix"
+            class="gcode-ghost-overlay"
+            :style="overlayStyle"
+            aria-hidden="true">
+            <span class="gcode-ghost-mirror">{{ gcode }}</span>
+            <span class="gcode-ghost-text">{{ activeParam ? `${activeParam}=` : activeValueSuffix }}</span>
         </div>
     </div>
 </template>
@@ -36,7 +40,13 @@ import { Component, Mixins, Ref, Watch } from 'vue-property-decorator'
 import BaseMixin from '@/components/mixins/base'
 import ConsoleMixin from '@/components/mixins/console'
 import { mdiSend, mdiChevronDoubleRight } from '@mdi/js'
-import { PrinterStateGcodeCommand, PrinterStateMacro, VTextareaType } from '@/store/printer/types'
+import {
+    PrinterStateGcodeCommand,
+    PrinterStateGcodeCommandParam,
+    PrinterStateMacro,
+    PrinterStateMacroParam,
+    VTextareaType,
+} from '@/store/printer/types'
 import { strLongestEqual } from '@/plugins/helpers'
 import throttle from 'lodash.throttle'
 
@@ -54,6 +64,13 @@ export default class ConsoleTextarea extends Mixins(BaseMixin, ConsoleMixin) {
     activeParam: string | null = null
     remainingParams: string[] = []
     activeParamIndex = 0
+
+    activeValue: string | null = null
+    activeValueSuffix: string | null = null
+    matchingValues: string[] = []
+    activeValueIndex = 0
+    typedValuePrefix = ''
+
     overlayStyle: Record<string, string> = {}
     resizeObserver: ResizeObserver | null = null
 
@@ -64,6 +81,7 @@ export default class ConsoleTextarea extends Mixins(BaseMixin, ConsoleMixin) {
     @Watch('gcode')
     onGcodeChanged(): void {
         this.activeParamIndex = 0
+        this.activeValueIndex = 0
         this.$nextTick(() => {
             this.refreshGhostParam()
             this.updateOverlayRect()
@@ -184,6 +202,16 @@ export default class ConsoleTextarea extends Mixins(BaseMixin, ConsoleMixin) {
     }
 
     onTab(e: KeyboardEvent): void {
+        if (this.activeValue !== null && this.matchingValues.length) {
+            e.preventDefault()
+            const direction = e.shiftKey ? -1 : 1
+            const length = this.matchingValues.length
+            this.activeValueIndex = (this.activeValueIndex + direction + length) % length
+            this.activeValue = this.matchingValues[this.activeValueIndex]
+            this.activeValueSuffix = this.activeValue.substring(this.typedValuePrefix.length)
+            return
+        }
+
         if (this.activeParam !== null && this.remainingParams.length) {
             e.preventDefault()
             const direction = e.shiftKey ? -1 : 1
@@ -197,6 +225,17 @@ export default class ConsoleTextarea extends Mixins(BaseMixin, ConsoleMixin) {
     }
 
     onRightArrow(e: KeyboardEvent): void {
+        if (this.activeValue !== null) {
+            e.preventDefault()
+
+            this.gcode = this.gcode.substring(0, this.gcode.length - this.typedValuePrefix.length) + this.activeValue
+
+            this.$nextTick(() => {
+                this.gcodeCommandField?.$refs?.input?.setSelectionRange(this.gcode.length, this.gcode.length)
+            })
+            return
+        }
+
         if (this.activeParam === null) return
 
         e.preventDefault()
@@ -212,13 +251,12 @@ export default class ConsoleTextarea extends Mixins(BaseMixin, ConsoleMixin) {
         this.refreshGhostParam()
     }
 
-    getParamNames(name: string): string[] {
+    getParams(name: string): { [key: string]: PrinterStateGcodeCommandParam | PrinterStateMacroParam } | null {
         const command: PrinterStateGcodeCommand | undefined =
             this.$store.state.printer.gcode?.commands?.[name.toUpperCase()]
         const macro: PrinterStateMacro | undefined = this.$store.getters['printer/getMacro'](name)
-        const params = command?.params ?? macro?.params
 
-        return params ? Object.keys(params).filter((paramName) => !paramName.startsWith('_')) : []
+        return command?.params ?? macro?.params ?? null
     }
 
     refreshGhostParam(): void {
@@ -232,20 +270,51 @@ export default class ConsoleTextarea extends Mixins(BaseMixin, ConsoleMixin) {
         const currentLine = this.gcode.substring(lastNewlineIndex + 1)
         const macroNameMatch = currentLine.match(/^(\S+)\s/)
 
-        const allParams = cursorAtEnd && macroNameMatch ? this.getParamNames(macroNameMatch[1]) : []
+        const params = cursorAtEnd && macroNameMatch ? this.getParams(macroNameMatch[1]) : null
 
-        if (!cursorAtEnd || !macroNameMatch || !allParams.length) {
+        if (!cursorAtEnd || !macroNameMatch || !params) {
             this.activeParam = null
             this.remainingParams = []
+            this.activeValue = null
+            this.activeValueSuffix = null
+            this.matchingValues = []
             return
         }
 
+        const allParamNames = Object.keys(params).filter((paramName) => !paramName.startsWith('_'))
         const rest = currentLine.substring(macroNameMatch[1].length).trim()
-        const provided = new Set(
-            (rest.length ? rest.split(/\s+/) : []).map((token) => token.split('=')[0].toUpperCase())
-        )
+        const tokens = rest.length ? rest.split(/\s+/) : []
+        const provided = new Set(tokens.map((token) => token.split('=')[0].toUpperCase()))
 
-        this.remainingParams = allParams.filter((name) => !provided.has(name.toUpperCase()))
+        this.remainingParams = allParamNames.filter((name) => !provided.has(name.toUpperCase()))
+
+        // Value-suggestion mode: cursor sits right after "KEY=", optionally with part of
+        // the value already typed (eg "HEATER=ext"), so the line has no trailing space yet.
+        const lastToken = tokens[tokens.length - 1] ?? ''
+        const equalsIndex = lastToken.indexOf('=')
+
+        if (!currentLine.endsWith(' ') && equalsIndex !== -1) {
+            const key = lastToken.substring(0, equalsIndex).toUpperCase()
+            const typedValue = lastToken.substring(equalsIndex + 1)
+            const paramName = allParamNames.find((name) => name.toUpperCase() === key)
+            const param = paramName ? params[paramName] : undefined
+            const enumValues = param && 'enum' in param ? param.enum : undefined
+            const matches = enumValues?.filter((value) => value.toLowerCase().startsWith(typedValue.toLowerCase()))
+
+            if (matches?.length) {
+                this.activeParam = null
+                this.typedValuePrefix = typedValue
+                this.matchingValues = matches
+                this.activeValueIndex = this.activeValueIndex % matches.length
+                this.activeValue = matches[this.activeValueIndex]
+                this.activeValueSuffix = this.activeValue.substring(typedValue.length)
+                return
+            }
+        }
+
+        this.activeValue = null
+        this.activeValueSuffix = null
+        this.matchingValues = []
 
         if (!this.remainingParams.length || !currentLine.endsWith(' ')) {
             this.activeParam = null
