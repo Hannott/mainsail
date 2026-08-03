@@ -183,10 +183,12 @@ export default class ConsoleTextarea extends Mixins(BaseMixin, ConsoleMixin) {
         this.gcode = this.gcode.substring(0, start + 1) + text + this.gcode.substring(end)
     }
 
-    onTab(e: Event): void {
+    onTab(e: KeyboardEvent): void {
         if (this.activeParam !== null && this.remainingParams.length) {
             e.preventDefault()
-            this.activeParamIndex = (this.activeParamIndex + 1) % this.remainingParams.length
+            const direction = e.shiftKey ? -1 : 1
+            const length = this.remainingParams.length
+            this.activeParamIndex = (this.activeParamIndex + direction + length) % length
             this.activeParam = this.remainingParams[this.activeParamIndex]
             return
         }
@@ -267,7 +269,7 @@ export default class ConsoleTextarea extends Mixins(BaseMixin, ConsoleMixin) {
             top: `${textareaRect.top - wrapperRect.top}px`,
             left: `${textareaRect.left - wrapperRect.left}px`,
             width: `${textareaRect.width}px`,
-            height: `${textareaRect.height}px`,
+            minHeight: `${textareaRect.height}px`,
             boxSizing: computed.boxSizing,
             padding: computed.padding,
             borderWidth: computed.borderWidth,
