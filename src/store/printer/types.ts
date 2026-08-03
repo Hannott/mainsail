@@ -178,6 +178,19 @@ export interface PrinterStateMacro {
     params: PrinterStateMacroParams
 }
 
+export interface PrinterStateGcodeCommandParam {
+    type?: 'int' | 'float' | 'string' | 'boolean'
+    required?: boolean
+    default?: unknown
+}
+
+export interface PrinterStateGcodeCommand {
+    help?: string
+    params?: {
+        [key: string]: PrinterStateGcodeCommandParam
+    }
+}
+
 export interface PrinterStateKlipperConfig {
     [key: string]: unknown
 }
